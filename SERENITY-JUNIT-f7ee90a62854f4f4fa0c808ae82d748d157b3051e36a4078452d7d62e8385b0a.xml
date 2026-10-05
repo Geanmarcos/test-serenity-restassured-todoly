@@ -1,1 +1,1 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?><testsuite errors="0" failures="0" name="crudAPIUpgrade" skipped="0" tests="2" time="7.56" timestamp="2026-10-05 04:35:34"><testcase name="Como usuario quiero hacer el CRUD de un proyecto y item por API"/></testsuite>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><testsuite errors="0" failures="0" name="crudAPIUpgrade" skipped="0" tests="2" time="6.8" timestamp="2026-10-05 07:36:02"><testcase name="Como usuario quiero hacer el CRUD de un proyecto y item por API"/></testsuite>
