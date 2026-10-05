@@ -91,10 +91,6 @@ test {
         println ">>> tags: ${tags}"
     }
 
-    testLogging {
-        events "passed", "failed", "skipped"
-        showStandardStreams = false
-    }
 }
 
 serenity {
