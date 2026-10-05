@@ -1,0 +1,91 @@
+name: serenity
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      tags:
+        description: 'Tags de Cucumber (ej: @smoke, @TestCrudClean, @smoke and not @wip)'
+        required: false
+        default: '@TestCrudClean'
+        type: string
+      env:
+        description: 'Ambiente (environment de serenity.conf)'
+        required: false
+        default: 'default'
+        type: choice
+        options: [ default ]
+
+# Cancela ejecuciones viejas solo en PRs (en main no, para no cortar un deploy)
+concurrency:
+  group: serenity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  serenity-api-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: write   # necesario para publicar en gh-pages
+
+    env:
+      USERNAME_TODOLY: ${{ secrets.USERNAME_TODOLY }}
+      PASSWORD_TODOLY: ${{ secrets.PASSWORD_TODOLY }}
+      # Los inputs se pasan por env (no interpolados en el script) para evitar inyección
+      CUCUMBER_TAGS: ${{ github.event.inputs.tags || '@TestCrudClean' }}
+      TEST_ENV: ${{ github.event.inputs.env || 'default' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Validate required secrets
+        run: |
+          if [ -z "$USERNAME_TODOLY" ] || [ -z "$PASSWORD_TODOLY" ]; then
+            echo "::error::Faltan los secrets USERNAME_TODOLY / PASSWORD_TODOLY"
+            exit 1
+          fi
+
+      # Sin continue-on-error: si hay tests fallidos, el job termina en rojo.
+      # Los pasos siguientes usan if: always() para publicar igualmente el reporte.
+      - name: Run Serenity tests
+        run: |
+          ./gradlew clean test \
+            "-Dcucumber.filter.tags=$CUCUMBER_TAGS" \
+            "-Denvironment=$TEST_ENV" \
+            --console=plain
+
+      - name: Verify Serenity report
+        if: always()
+        run: |
+          echo "Contenido de target/site/serenity:"
+          ls -la target/site/serenity/ || echo "La carpeta no existe"
+
+      - name: Prepare report for GitHub Pages
+        if: always() && github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p public-report
+          cp -r target/site/serenity/* public-report/
+
+      # Solo se publica desde main (los PRs no deben sobreescribir el reporte)
+      - name: Deploy Serenity Report to GitHub Pages
+        if: always() && github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: public-report
